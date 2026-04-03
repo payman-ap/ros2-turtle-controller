@@ -2,6 +2,7 @@
 import rclpy
 from rclpy.node import Node
 import random
+import math
 from turtlesim.srv import Spawn, Kill
 from turtlesim.msg import Pose
 from geometry_msgs.msg import Twist
@@ -15,6 +16,8 @@ class TurtleControllerNode(Node):
         self.counter_ = 2
         self.max_iterations = 9
         self.current_iteration = 0
+        self.alive_turtles = {}
+        self.kill_distance_threshold = 0.6
 
         self.spawn_client_ = self.create_client(Spawn, "trigger_spawn")
         self.kill_client_ = self.create_client(Kill, "trigger_kill")
@@ -41,24 +44,31 @@ class TurtleControllerNode(Node):
 
     def pose_callback(self, msg: Pose):
         # self.get_logger().info(f"Turtle pose: ({str(msg.x)} , {str(msg.y)}) with {str(msg.theta)} degrees")
+        # self.get_logger().info(str(self.alive_turtles))
         pose_message = String()
         pose_message.data = f"Turtle pose: ({str(msg.x)} , {str(msg.y)}) with {str(msg.theta)} degrees"
         self.pose_publisher_.publish(pose_message)
+        t1_x = msg.x
+        t1_y = msg.y
+        for name in list(self.alive_turtles.keys()):
+            pos = self.alive_turtles[name]
+            dist = math.sqrt((t1_x - pos[0])**2 + (t1_y - pos[1])**2)
+
+            if dist < self.kill_distance_threshold:
+                self.kill_turtle(name)
+
 
     def control_loop(self):
-
         if self.current_iteration >= self.max_iterations:
             self.timer_.cancel()
             return
-
+        
         self.spawn_new_turtle()
-
         # create one-shot timer
         self.kill_timer_ = self.create_timer(
             0.75,
             self.kill_timer_callback
         )
-
         self.current_iteration += 1
 
 
@@ -81,10 +91,18 @@ class TurtleControllerNode(Node):
         request.name = 'turtle' + str(self.counter_)
 
         future = self.spawn_client_.call_async(request)
+        self.alive_turtles[request.name] = [request.x, request.y]
         future.add_done_callback(self.callback_call_spawn)
         self.counter_ += 1
         self.last_spawned_name_ = None
 
+    def kill_turtle(self, name):
+        request = Kill.Request()
+        request.name = name
+
+        future = self.kill_client_.call_async(request)
+
+        future.add_done_callback(lambda future: self.after_kill(name))
         
 
     def kill_last_turtle(self):
@@ -95,6 +113,12 @@ class TurtleControllerNode(Node):
         # request.name = self.last_spawned_name_
         # future = self.kill_client_.call_async(request)
         # future.add_done_callback(self.callback_call_kill)
+
+    def after_kill(self, name):
+        if name in self.alive_turtles:
+            del self.alive_turtles[name]
+        self.get_logger().info(f"Ate {name}!")
+
 
 
 
