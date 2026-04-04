@@ -70,6 +70,7 @@ class TurtleControllerNode(Node):
             dist = math.sqrt((t1_x - pos[0])**2 + (t1_y - pos[1])**2)
             if dist < self.kill_distance_threshold:
                 self.kill_turtle(name)
+                self.spawn_new_turtle()
 
     def move_spiral(self):
         cmd = Twist()
