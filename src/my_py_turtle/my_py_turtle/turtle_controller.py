@@ -3,11 +3,13 @@ import rclpy
 from rclpy.node import Node
 import random
 import math
+import time
 from turtlesim.srv import Spawn, Kill
 from turtlesim.msg import Pose
 from geometry_msgs.msg import Twist
 from example_interfaces.msg import Int64, String
-import time
+from my_robot_interfaces.srv import CatchTurtle, SpawnTurtle
+from my_robot_interfaces.msg import Turtle, TurtleArray
 
 
 class TurtleControllerNode(Node):
@@ -31,12 +33,17 @@ class TurtleControllerNode(Node):
 
         self.spawn_client_ = self.create_client(Spawn, "trigger_spawn")
         self.kill_client_ = self.create_client(Kill, "trigger_kill")
+        self.myspawn_client_ = self.create_client(SpawnTurtle, "trigger_myspawn")
+        self.catch_client_ = self.create_client(CatchTurtle, "trigger_catch")
 
         while not self.spawn_client_.wait_for_service(timeout_sec=1.0):
             self.get_logger().info("Waiting for trigger_spawn service...")
 
         while not self.kill_client_.wait_for_service(timeout_sec=1.0):
             self.get_logger().info("Waiting for trigger_kill service...")
+
+        while not self.myspawn_client_.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info("Waiting for trigger_myspawn service...")
 
 
         # Create subscriber
@@ -70,7 +77,8 @@ class TurtleControllerNode(Node):
             dist = math.sqrt((t1_x - pos[0])**2 + (t1_y - pos[1])**2)
             if dist < self.kill_distance_threshold:
                 self.kill_turtle(name)
-                self.spawn_new_turtle()
+                # self.spawn_new_turtle()
+                self.my_spawn_new_turtle()
 
     def move_spiral(self):
         cmd = Twist()
@@ -130,7 +138,8 @@ class TurtleControllerNode(Node):
             self.timer_.cancel()
             return
         
-        self.spawn_new_turtle()
+        # self.spawn_new_turtle()
+        self.my_spawn_new_turtle()
         # create one-shot timer
         self.kill_timer_ = self.create_timer(
             0.75,
@@ -147,6 +156,19 @@ class TurtleControllerNode(Node):
 
     def callback_turtles_alive(self, msg: String):
         self.get_logger().info(msg.data)
+
+    def my_spawn_new_turtle(self):
+        request = SpawnTurtle.Request()
+        request.x = random.uniform(1.0, 10.0)
+        request.y = random.uniform(1.0, 10.0)
+        request.theta = random.uniform(0.0, 6.28)
+        request.name = 'turtle' + str(self.counter_)
+        future = self.myspawn_client_.call_async(request)
+        self.alive_turtles[request.name] = [request.x, request.y]
+        future.add_done_callback(self.callback_call_spawn)
+        self.counter_ += 1
+        self.last_spawned_name_ = None
+
 
     def spawn_new_turtle(self):
 
@@ -165,9 +187,11 @@ class TurtleControllerNode(Node):
 
     def kill_turtle(self, name):
         request = Kill.Request()
+        # request = CatchTurtle.Request()
         request.name = name
 
         future = self.kill_client_.call_async(request)
+        # future = self.catch_client_.call_async(request)
 
         future.add_done_callback(lambda future: self.after_kill(name))
         

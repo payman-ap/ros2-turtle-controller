@@ -3,6 +3,8 @@ import rclpy
 from rclpy.node import Node
 from turtlesim.srv import Spawn, Kill
 from example_interfaces.msg import Int64, String
+from my_robot_interfaces.srv import CatchTurtle, SpawnTurtle
+from my_robot_interfaces.msg import Turtle, TurtleArray
 
 class TurtleSpawnerNode(Node):
     def __init__(self):
@@ -22,6 +24,10 @@ class TurtleSpawnerNode(Node):
                                                   self.callback_spawn_turtle)
         self.kill_service_ = self.create_service(Kill, "trigger_kill",
                                                  self.callback_kill_turtle)
+        self.catch_service_ = self.create_service(CatchTurtle, "trigger_catch",
+                                                  self.callback_catch_turtle)
+        self.myspawn_service_ = self.create_service(SpawnTurtle, "trigger_myspawn",
+                                                  self.callback_myspawn_turtle)
         # Create publisher
         self.turtles_publisher_ = self.create_publisher(String, "alive_turtles", 10)
 
@@ -29,6 +35,34 @@ class TurtleSpawnerNode(Node):
         self.get_logger().info("Turtle Spawner Node has started.")
 
     
+    def callback_catch_turtle(self, request: CatchTurtle.Request, response: CatchTurtle.Response):
+        self.get_logger().info(f"Killing turtle {request.name}")
+        self.kill_client_.call_async(request)
+        return response
+    
+    def callback_myspawn_turtle(self, request: SpawnTurtle.Request, response: SpawnTurtle.Response):
+        # Forward the request to turtlesim
+        self.get_logger().info(f"Spawning turtle {request.name} at ({request.x}, {request.y})")
+        
+        # Call turtlesim synchronously for simplicity in this proxy
+        request_turtlesim = Spawn.Request()
+        request_turtlesim.x = request.x
+        request_turtlesim.y = request.y
+        request_turtlesim.theta = request.theta
+        request_turtlesim.name = request.name
+
+        self.spawn_client_.call_async(request_turtlesim)
+
+        
+        response.name = request.name
+
+        msg = String()
+        msg.data = f"Spawned Turtle {request.name}"
+        self.turtles_publisher_.publish(msg)
+
+        return response
+
+
     def callback_kill_turtle(self, request: Kill.Request, response: Kill.Response):
         self.get_logger().info(f"Killing turtle {request.name}")
         self.kill_client_.call_async(request)
