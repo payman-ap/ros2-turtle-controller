@@ -29,7 +29,7 @@ class TurtleSpawnerNode(Node):
         self.myspawn_service_ = self.create_service(SpawnTurtle, "trigger_myspawn",
                                                   self.callback_myspawn_turtle)
         # Create publisher
-        self.turtles_publisher_ = self.create_publisher(String, "alive_turtles", 10)
+        self.turtles_publisher_ = self.create_publisher(Turtle, "/alive_turtles", 10)
 
         # Logging
         self.get_logger().info("Turtle Spawner Node has started.")
@@ -40,6 +40,7 @@ class TurtleSpawnerNode(Node):
         request_obj = Kill.Request()
         request_obj.name = request.name
         self.kill_client_.call_async(request_obj)
+        response.success = True
         return response
 
     
@@ -59,8 +60,12 @@ class TurtleSpawnerNode(Node):
         
         response.name = request.name
 
-        msg = String()
-        msg.data = f"Spawned Turtle {request.name}"
+        msg = Turtle()
+        msg.name = request.name
+        msg.x = request.x
+        msg.y = request.y
+        msg.theta = request.theta
+        self.get_logger().info(f"Spawned Turtle {request.name}")
         self.turtles_publisher_.publish(msg)
 
         return response
@@ -70,10 +75,7 @@ class TurtleSpawnerNode(Node):
         self.get_logger().info(f"Killing turtle {request.name}")
         self.kill_client_.call_async(request)
 
-        msg = String()
-        msg.data = f"Killed Turtle {request.name}"
-
-        self.turtles_publisher_.publish(msg)
+        self.get_logger().info(f"Killed Turtle {request.name}")
 
         return response
 
@@ -88,9 +90,12 @@ class TurtleSpawnerNode(Node):
 
         response.name = request.name
 
-        msg = String()
-        msg.data = f"Spawned Turtle {request.name}"
-
+        msg = Turtle()
+        msg.name = request.name
+        msg.x = request.y
+        msg.y = request.theta
+        msg.theta = request.name
+        self.get_logger().info(f"Spawned Turtle {request.name}")
         self.turtles_publisher_.publish(msg)
 
         return response

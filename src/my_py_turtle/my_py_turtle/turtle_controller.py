@@ -50,12 +50,17 @@ class TurtleControllerNode(Node):
 
 
         # Create subscriber
-        self.turtles_subscriber_ = self.create_subscription(String, "alive_turtles", 
-                                                            self.callback_turtles_alive, 10)
+        self.turtles_subscriber_ = self.create_subscription(Turtle, "/alive_turtles", 
+                                                            self.callback_alive_turtles, 10)
+        self.turtles_array_subscriber_ = self.create_subscription(TurtleArray, "/turtles_array",
+                                                            self.callback_turtles_array, 10)
         self.pose_subscriber_ = self.create_subscription(Pose, "/turtle1/pose", 
                                                          self.pose_callback, 10)
+
+
         self.pose_publisher_ = self.create_publisher(String, "/turtle1_pose", 10)
         self.cmd_vel_publisher_ = self.create_publisher(Twist, "/turtle1/cmd_vel", 10)
+        self.turtles_array_publisher_ = self.create_publisher(TurtleArray, "/turtles_array", 10)
 
         self.timer_ = self.create_timer(0.25, self.control_loop)
 
@@ -101,7 +106,6 @@ class TurtleControllerNode(Node):
             self.get_logger().info("No turtles to hunt?")
             return
         
-        
         # Find the closest turtle
         t1_x = self.pose_.x
         t1_y = self.pose_.y
@@ -125,7 +129,7 @@ class TurtleControllerNode(Node):
 
         # Generating the Twist command
         cmd = Twist()
-        if dist > 0.1:  # Tolerance: stop if we are 0.1 units away
+        if min_dist > 0.1:  # Tolerance: stop if we are 0.1 units away
             # Proportional Control: move faster if far, slow down as you get closer
             cmd.linear.x = self.p_gain * min_dist  
             cmd.angular.z = self.angular_gain * steering_angle
@@ -157,8 +161,36 @@ class TurtleControllerNode(Node):
         self.kill_last_turtle()
 
 
-    def callback_turtles_alive(self, msg: String):
-        self.get_logger().info(msg.data)
+    def callback_alive_turtles(self, msg: Turtle):
+        self.get_logger().info("Received new turtle")
+        self.alive_turtles[msg.name] = [msg.x, msg.y]
+        self.publish_alive_turtles_array()
+
+
+    def callback_turtles_array(self, msg: TurtleArray):
+        # Clear the alive turtles dictionary
+        self.alive_turtles.clear()
+        # rebuild the dictionary from message
+        for turtle in msg.turtles:
+            self.alive_turtles[turtle.name] = [turtle.x, turtle.y]
+
+        self.get_logger().info(f"Updated alive turtles dictionary: {len(self.alive_turtles)} turtles")
+    
+
+    def publish_alive_turtles_array(self):
+        # Dictionary = source of truth
+        # TurtleArray = snapshot copy
+
+        msg = TurtleArray()
+        for name, pos in self.alive_turtles.items():
+            turtle = Turtle()
+            turtle.name = name
+            turtle.x = pos[0]
+            turtle.y = pos[1]
+            turtle.theta = 0.0
+            msg.turtles.append(turtle)
+        self.turtles_array_publisher_.publish(msg)
+
 
     def myspawn_new_turtle(self):
         request = SpawnTurtle.Request()
@@ -167,7 +199,7 @@ class TurtleControllerNode(Node):
         request.theta = random.uniform(0.0, 6.28)
         request.name = 'turtle' + str(self.counter_)
         future = self.myspawn_client_.call_async(request)
-        self.alive_turtles[request.name] = [request.x, request.y]
+        # self.alive_turtles[request.name] = [request.x, request.y]
         future.add_done_callback(self.callback_call_spawn)
         self.counter_ += 1
         self.last_spawned_name_ = None
@@ -183,7 +215,7 @@ class TurtleControllerNode(Node):
         request.name = 'turtle' + str(self.counter_)
 
         future = self.spawn_client_.call_async(request)
-        self.alive_turtles[request.name] = [request.x, request.y]
+        # self.alive_turtles[request.name] = [request.x, request.y]
         future.add_done_callback(self.callback_call_spawn)
         self.counter_ += 1
         self.last_spawned_name_ = None
@@ -211,6 +243,7 @@ class TurtleControllerNode(Node):
     def after_kill(self, name):
         if name in self.alive_turtles:
             del self.alive_turtles[name]
+        self.publish_alive_turtles_array()
         self.get_logger().info(f"Ate {name}!")
 
 

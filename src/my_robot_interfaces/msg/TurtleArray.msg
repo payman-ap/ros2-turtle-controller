@@ -1,1 +1,1 @@
-float64[] turtle_coordinates
+Turtle[] turtles
