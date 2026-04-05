@@ -37,8 +37,11 @@ class TurtleSpawnerNode(Node):
     
     def callback_catch_turtle(self, request: CatchTurtle.Request, response: CatchTurtle.Response):
         self.get_logger().info(f"Killing turtle {request.name}")
-        self.kill_client_.call_async(request)
+        request_obj = Kill.Request()
+        request_obj.name = request.name
+        self.kill_client_.call_async(request_obj)
         return response
+
     
     def callback_myspawn_turtle(self, request: SpawnTurtle.Request, response: SpawnTurtle.Response):
         # Forward the request to turtlesim

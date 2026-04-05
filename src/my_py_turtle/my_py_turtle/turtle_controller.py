@@ -45,6 +45,9 @@ class TurtleControllerNode(Node):
         while not self.myspawn_client_.wait_for_service(timeout_sec=1.0):
             self.get_logger().info("Waiting for trigger_myspawn service...")
 
+        while not self.catch_client_.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info("Waiting for trigger_catch service...")
+
 
         # Create subscriber
         self.turtles_subscriber_ = self.create_subscription(String, "alive_turtles", 
@@ -78,7 +81,7 @@ class TurtleControllerNode(Node):
             if dist < self.kill_distance_threshold:
                 self.kill_turtle(name)
                 # self.spawn_new_turtle()
-                self.my_spawn_new_turtle()
+                self.myspawn_new_turtle()
 
     def move_spiral(self):
         cmd = Twist()
@@ -139,7 +142,7 @@ class TurtleControllerNode(Node):
             return
         
         # self.spawn_new_turtle()
-        self.my_spawn_new_turtle()
+        self.myspawn_new_turtle()
         # create one-shot timer
         self.kill_timer_ = self.create_timer(
             0.75,
@@ -157,7 +160,7 @@ class TurtleControllerNode(Node):
     def callback_turtles_alive(self, msg: String):
         self.get_logger().info(msg.data)
 
-    def my_spawn_new_turtle(self):
+    def myspawn_new_turtle(self):
         request = SpawnTurtle.Request()
         request.x = random.uniform(1.0, 10.0)
         request.y = random.uniform(1.0, 10.0)
@@ -186,12 +189,12 @@ class TurtleControllerNode(Node):
         self.last_spawned_name_ = None
 
     def kill_turtle(self, name):
-        request = Kill.Request()
-        # request = CatchTurtle.Request()
+        # request = Kill.Request()
+        request = CatchTurtle.Request()
         request.name = name
 
-        future = self.kill_client_.call_async(request)
-        # future = self.catch_client_.call_async(request)
+        # future = self.kill_client_.call_async(request)
+        future = self.catch_client_.call_async(request)
 
         future.add_done_callback(lambda future: self.after_kill(name))
         
