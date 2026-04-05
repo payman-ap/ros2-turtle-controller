@@ -1,0 +1,21 @@
+game1:
+  game1_controller:
+    ros__parameters:
+      max_alive_turtles: 9
+      kill_distance_threshold: 0.6
+      linear_vel: 2.0
+      radius: 0.5
+      angle_decrement: 0.02
+      p_gain: 1.5
+      angular_gain: 2.0
+
+game2:
+  game2_controller:
+    ros__parameters:
+      max_alive_turtles: 5
+      kill_distance_threshold: 0.2
+      linear_vel: 2.0
+      radius: 0.5
+      angle_decrement: 0.02
+      p_gain: 3.5
+      angular_gain: 4.0

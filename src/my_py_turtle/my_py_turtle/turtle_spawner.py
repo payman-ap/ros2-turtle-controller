@@ -29,7 +29,7 @@ class TurtleSpawnerNode(Node):
         self.myspawn_service_ = self.create_service(SpawnTurtle, "trigger_myspawn",
                                                   self.callback_myspawn_turtle)
         # Create publisher
-        self.turtles_publisher_ = self.create_publisher(Turtle, "/alive_turtles", 10)
+        self.turtles_publisher_ = self.create_publisher(Turtle, "alive_turtles", 10)
 
         # Logging
         self.get_logger().info("Turtle Spawner Node has started.")

@@ -1,0 +1,44 @@
+<launch>
+
+    <!-- Game 1 -->
+    <group>
+        <push-ros-namespace namespace="game1"/>
+
+        <node pkg="turtlesim"
+              exec="turtlesim_node"
+              name="turtlesim"/>
+
+        <node pkg="my_py_turtle"
+              exec="turtle_spawner"
+              name="turtle_spawner"/>
+
+        <node pkg="my_py_turtle"
+              exec="turtle_controller"
+              name="game1_controller">
+            <param from="$(find-pkg-share my_robot_bringup)/config/turtle_controller_multi.yaml"/>
+        </node>
+
+    </group>
+
+
+    <!-- Game 2 -->
+    <group>
+        <push-ros-namespace namespace="game2"/>
+
+        <node pkg="turtlesim"
+              exec="turtlesim_node"
+              name="turtlesim"/>
+
+        <node pkg="my_py_turtle"
+              exec="turtle_spawner"
+              name="turtle_spawner"/>
+
+        <node pkg="my_py_turtle"
+              exec="turtle_controller"
+              name="game2_controller">
+            <param from="$(find-pkg-share my_robot_bringup)/config/turtle_controller_multi.yaml"/>
+        </node>
+
+    </group>
+
+</launch>

@@ -15,20 +15,29 @@ from my_robot_interfaces.msg import Turtle, TurtleArray
 class TurtleControllerNode(Node):
     def __init__(self):
         super().__init__("turtle_controller")
+
+        self.declare_parameter("max_alive_turtles", 9)
+        self.declare_parameter("kill_distance_threshold", 0.6)
+        self.declare_parameter("linear_vel", 2.0)
+        self.declare_parameter("radius", 0.5)
+        self.declare_parameter("angle_decrement", 0.02)
+        self.declare_parameter("p_gain", 1.5)
+        self.declare_parameter("angular_gain", 2.0)
+
         self.counter_ = 2
-        self.max_iterations = 9
+        self.max_iterations = self.get_parameter("max_alive_turtles").value
         self.current_iteration = 0
         self.alive_turtles = {}
-        self.kill_distance_threshold = 0.6
+        self.kill_distance_threshold = self.get_parameter("kill_distance_threshold").value
 
         self.pose_ = None  # To store turtle1's current position so the timer can access it
 
-        self.linear_vel = 2.0
-        self.radius = 0.5
-        self.angle_decrement = 0.02
+        self.linear_vel = self.get_parameter("linear_vel").value
+        self.radius = self.get_parameter("radius").value
+        self.angle_decrement = self.get_parameter("angle_decrement").value
 
-        self.p_gain = 1.5
-        self.angular_gain = 2.0
+        self.p_gain = self.get_parameter("p_gain").value
+        self.angular_gain = self.get_parameter("angular_gain").value
         
 
         self.spawn_client_ = self.create_client(Spawn, "trigger_spawn")
@@ -50,17 +59,17 @@ class TurtleControllerNode(Node):
 
 
         # Create subscriber
-        self.turtles_subscriber_ = self.create_subscription(Turtle, "/alive_turtles", 
+        self.turtles_subscriber_ = self.create_subscription(Turtle, "alive_turtles", 
                                                             self.callback_alive_turtles, 10)
-        self.turtles_array_subscriber_ = self.create_subscription(TurtleArray, "/turtles_array",
+        self.turtles_array_subscriber_ = self.create_subscription(TurtleArray, "turtles_array",
                                                             self.callback_turtles_array, 10)
-        self.pose_subscriber_ = self.create_subscription(Pose, "/turtle1/pose", 
+        self.pose_subscriber_ = self.create_subscription(Pose, "turtle1/pose", 
                                                          self.pose_callback, 10)
 
 
-        self.pose_publisher_ = self.create_publisher(String, "/turtle1_pose", 10)
-        self.cmd_vel_publisher_ = self.create_publisher(Twist, "/turtle1/cmd_vel", 10)
-        self.turtles_array_publisher_ = self.create_publisher(TurtleArray, "/turtles_array", 10)
+        self.pose_publisher_ = self.create_publisher(String, "turtle1_pose", 10)
+        self.cmd_vel_publisher_ = self.create_publisher(Twist, "turtle1/cmd_vel", 10)
+        self.turtles_array_publisher_ = self.create_publisher(TurtleArray, "turtles_array", 10)
 
         self.timer_ = self.create_timer(0.25, self.control_loop)
 
