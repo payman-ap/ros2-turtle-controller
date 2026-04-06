@@ -65,7 +65,7 @@ private:
         RCLCPP_INFO(this->get_logger(), "Spawning turtle  %s at (%.2f, %.2f)",
                             request->name.c_str(), request->x, request->y);
         // Call turtlesim asyncronously
-        auto result = this->spawn_client_->async_send_request(request);
+        auto result_future = this->spawn_client_->async_send_request(request);
         response->name = request->name;
 
         auto msg = std::make_shared<my_robot_interfaces::msg::Turtle>();
@@ -84,6 +84,10 @@ private:
                         turtlesim::srv::Kill::Response::SharedPtr /*response*/)
     {
         RCLCPP_INFO(this->get_logger(), "Kill request received for turtle: %s", request->name.c_str());
+
+        auto result_future = this->kill_client_->async_send_request(request);
+
+        RCLCPP_INFO(this->get_logger(), "Killed turtle: %s", request->name.c_str());
     }
 
     void callback_catch_turtle(const my_robot_interfaces::srv::CatchTurtle::Request::SharedPtr request,
