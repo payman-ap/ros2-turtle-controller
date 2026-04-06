@@ -100,6 +100,13 @@ private:
                         my_robot_interfaces::srv::CatchTurtle::Response::SharedPtr /*response*/)
     {
         RCLCPP_INFO(this->get_logger(), "Catch request received for turtle: %s", request->name.c_str());
+
+        auto request_obj = std::make_shared<turtlesim::srv::Kill::Request>();
+        request_obj->name = request->name;
+        auto result_future = this->kill_client_->async_send_request(request_obj);
+
+        RCLCPP_INFO(this->get_logger(), "Successfully catched turtle: %s", request->name.c_str());
+
     }
 
     void callback_myspawn_turtle(const my_robot_interfaces::srv::SpawnTurtle::Request::SharedPtr request,
