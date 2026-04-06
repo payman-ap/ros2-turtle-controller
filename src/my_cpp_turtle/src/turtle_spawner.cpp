@@ -85,9 +85,15 @@ private:
     {
         RCLCPP_INFO(this->get_logger(), "Kill request received for turtle: %s", request->name.c_str());
 
-        auto result_future = this->kill_client_->async_send_request(request);
-
-        RCLCPP_INFO(this->get_logger(), "Killed turtle: %s", request->name.c_str());
+        auto result_future = this->kill_client_->async_send_request(request,
+        [this, name = request->name](rclcpp::Client<turtlesim::srv::Kill>::SharedFuture fut) {
+        try {
+            fut.get();  // throws if failed
+            RCLCPP_INFO(this->get_logger(), "Successfully killed turtle: %s", name.c_str());
+        } catch (...) {
+            RCLCPP_ERROR(this->get_logger(), "Failed to kill turtle: %s", name.c_str());
+        }}
+        );
     }
 
     void callback_catch_turtle(const my_robot_interfaces::srv::CatchTurtle::Request::SharedPtr request,
