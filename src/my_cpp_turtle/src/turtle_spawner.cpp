@@ -68,13 +68,13 @@ private:
         auto result_future = this->spawn_client_->async_send_request(request);
         response->name = request->name;
 
-        auto msg = std::make_shared<my_robot_interfaces::msg::Turtle>();
-        msg->name = request->name;
-        msg->x = request->x;
-        msg->y = request->y;
-        msg->theta = request->theta;
+        auto request_obj = std::make_shared<my_robot_interfaces::msg::Turtle>();
+        request_obj->name = request->name;
+        request_obj->x = request->x;
+        request_obj->y = request->y;
+        request_obj->theta = request->theta;
 
-        turtles_publisher_->publish(*msg);
+        turtles_publisher_->publish(*request_obj);
 
         RCLCPP_INFO(this->get_logger(), "Spawned Turtle  %s", request->name.c_str());
 
@@ -97,22 +97,45 @@ private:
     }
 
     void callback_catch_turtle(const my_robot_interfaces::srv::CatchTurtle::Request::SharedPtr request,
-                        my_robot_interfaces::srv::CatchTurtle::Response::SharedPtr /*response*/)
+                        my_robot_interfaces::srv::CatchTurtle::Response::SharedPtr response)
     {
         RCLCPP_INFO(this->get_logger(), "Catch request received for turtle: %s", request->name.c_str());
 
         auto request_obj = std::make_shared<turtlesim::srv::Kill::Request>();
         request_obj->name = request->name;
         auto result_future = this->kill_client_->async_send_request(request_obj);
-
+        response->success = true;
         RCLCPP_INFO(this->get_logger(), "Successfully catched turtle: %s", request->name.c_str());
 
     }
 
     void callback_myspawn_turtle(const my_robot_interfaces::srv::SpawnTurtle::Request::SharedPtr request,
-                        my_robot_interfaces::srv::SpawnTurtle::Response::SharedPtr /*response*/)
+                        my_robot_interfaces::srv::SpawnTurtle::Response::SharedPtr response)
     {
-        RCLCPP_INFO(this->get_logger(), "My custom spawn request received for: %s", request->name.c_str());
+        RCLCPP_INFO(this->get_logger(), "Spawning turtle  %s at (%.2f, %.2f)",
+                            request->name.c_str(), request->x, request->y);
+
+        // making object in spawn service type
+        auto request_obj = std::make_shared<turtlesim::srv::Spawn::Request>();
+        request_obj->name = request->name;
+        request_obj->x = request->x;
+        request_obj->y = request->y;
+        request_obj->theta = request->theta;
+
+        auto result_future = this->spawn_client_->async_send_request(request_obj);
+
+        response->name = request->name;
+
+        // making object in publisher turtle message type
+        auto request_obj_pub = std::make_shared<my_robot_interfaces::msg::Turtle>();
+        request_obj_pub->name = request->name;
+        request_obj_pub->x = request->x;
+        request_obj_pub->y = request->y;
+        request_obj_pub->theta = request->theta;
+        turtles_publisher_->publish(*request_obj_pub);
+
+        RCLCPP_INFO(this->get_logger(), "Spawned Turtle  %s", request->name.c_str());
+
     }
     
     // Definitions

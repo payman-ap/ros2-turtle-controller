@@ -48,7 +48,7 @@ class TurtleSpawnerNode(Node):
         # Forward the request to turtlesim
         self.get_logger().info(f"Spawning turtle {request.name} at ({request.x}, {request.y})")
         
-        # Call turtlesim synchronously for simplicity in this proxy
+        # Call turtlesim asynchronously for simplicity in this proxy
         request_turtlesim = Spawn.Request()
         request_turtlesim.x = request.x
         request_turtlesim.y = request.y
