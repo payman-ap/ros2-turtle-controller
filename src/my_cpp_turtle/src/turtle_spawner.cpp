@@ -1,32 +1,119 @@
 #include "rclcpp/rclcpp.hpp"
+#include "example_interfaces/msg/string.hpp"
+#include "my_robot_interfaces/srv/catch_turtle.hpp"
+#include "my_robot_interfaces/srv/spawn_turtle.hpp"
+#include "my_robot_interfaces/msg/turtle.hpp"
+#include "my_robot_interfaces/msg/turtle_array.hpp"
+#include "turtlesim/srv/spawn.hpp"
+#include "turtlesim/srv/kill.hpp"
 
-// public inheritance
-class MyNode : public rclcpp::Node
+using namespace std::placeholders;
+using namespace std::chrono_literals;
+
+class TurtleSpawnerNode : public rclcpp::Node
 {
 public:
-    MyNode() : Node("turtle_spawner"), counter_(0)
+    TurtleSpawnerNode() : Node("turtle_spawner")
     {
-        // using this-> is optional
-        RCLCPP_INFO(this->get_logger(), "Hello world");
-        timer_ = this->create_wall_timer(std::chrono::seconds(1),
-                                         std::bind(&MyNode::timerCallback, this));
+        spawn_client_ = this->create_client<turtlesim::srv::Spawn>("spawn");
+        kill_client_ = this->create_client<turtlesim::srv::Kill>("kill");
+
+        while (!spawn_client_->wait_for_service(1s)) {
+            if (!rclcpp::ok()) {
+                RCLCPP_INFO(this->get_logger(), "Interrupted while waiting for /spawn service...");
+                return;
+                }
+                RCLCPP_INFO(this->get_logger(), "/spawn service not available, waiting again...");
+            }
+        while (!kill_client_->wait_for_service(1s)) {
+            if (!rclcpp::ok()) {
+                RCLCPP_INFO(this->get_logger(), "Interrupted while waiting for /kill service...");
+            return;
+            }
+                RCLCPP_INFO(this->get_logger(), "/kill service not available, waiting again...");
+            }
+        
+        // === Services ===
+        spawn_service_ = this->create_service<turtlesim::srv::Spawn>(
+            "trigger_spawn",
+        std::bind(&TurtleSpawnerNode::callback_spawn_turtle, this, _1, _2));
+        kill_service_ = this->create_service<turtlesim::srv::Kill>(
+            "trigger_kill",
+        std::bind(&TurtleSpawnerNode::callback_kill_turtle, this, _1, _2));
+        catch_service_ = this->create_service<my_robot_interfaces::srv::CatchTurtle>(
+            "trigger_catch",
+        std::bind(&TurtleSpawnerNode::callback_catch_turtle, this, _1, _2));
+        myspawn_service_ = this->create_service<my_robot_interfaces::srv::SpawnTurtle>(
+            "trigger_myspawn",
+        std::bind(&TurtleSpawnerNode::callback_myspawn_turtle, this, _1, _2));
+
+        // === Publishers ===
+        turtles_publisher_ = this->create_publisher<my_robot_interfaces::msg::Turtle>(
+                                            "alive_turtles", 10);
+
+        // Checking while
+
+
+
+        RCLCPP_INFO(this->get_logger(), "Turtle Spawner Node has started.");
     }
 
 private:
-    void timerCallback()
+    void callback_spawn_turtle(const turtlesim::srv::Spawn::Request::SharedPtr request,
+                        turtlesim::srv::Spawn::Response::SharedPtr response)
     {
-        RCLCPP_INFO(this->get_logger(), "Hello %d", counter_);
-        counter_++;
+        RCLCPP_INFO(this->get_logger(), "Spawning turtle  %s at (%.2f, %.2f)",
+                            request->name.c_str(), request->x, request->y);
+        // Call turtlesim asyncronously
+        auto result = this->spawn_client_->async_send_request(request);
+        response->name = request->name;
+
+        auto msg = std::make_shared<my_robot_interfaces::msg::Turtle>();
+        msg->name = request->name;
+        msg->x = request->x;
+        msg->y = request->y;
+        msg->theta = request->theta;
+
+        turtles_publisher_->publish(*msg);
+
+        RCLCPP_INFO(this->get_logger(), "Spawned Turtle  %s", request->name.c_str());
+
+    }
+
+    void callback_kill_turtle(const turtlesim::srv::Kill::Request::SharedPtr request,
+                        turtlesim::srv::Kill::Response::SharedPtr /*response*/)
+    {
+        RCLCPP_INFO(this->get_logger(), "Kill request received for turtle: %s", request->name.c_str());
+    }
+
+    void callback_catch_turtle(const my_robot_interfaces::srv::CatchTurtle::Request::SharedPtr request,
+                        my_robot_interfaces::srv::CatchTurtle::Response::SharedPtr /*response*/)
+    {
+        RCLCPP_INFO(this->get_logger(), "Catch request received for turtle: %s", request->name.c_str());
+    }
+
+    void callback_myspawn_turtle(const my_robot_interfaces::srv::SpawnTurtle::Request::SharedPtr request,
+                        my_robot_interfaces::srv::SpawnTurtle::Response::SharedPtr /*response*/)
+    {
+        RCLCPP_INFO(this->get_logger(), "My custom spawn request received for: %s", request->name.c_str());
     }
     
-    rclcpp::TimerBase::SharedPtr timer_;
-    int counter_;
+    // Definitions
+    rclcpp::Client<turtlesim::srv::Spawn>::SharedPtr spawn_client_;
+    rclcpp::Client<turtlesim::srv::Kill>::SharedPtr kill_client_;
+    rclcpp::Service<turtlesim::srv::Spawn>::SharedPtr spawn_service_;
+    rclcpp::Service<turtlesim::srv::Kill>::SharedPtr kill_service_;
+    rclcpp::Service<my_robot_interfaces::srv::CatchTurtle>::SharedPtr catch_service_;
+    rclcpp::Service<my_robot_interfaces::srv::SpawnTurtle>::SharedPtr myspawn_service_;
+    rclcpp::Publisher<my_robot_interfaces::msg::Turtle>::SharedPtr turtles_publisher_;
+
+
 };
 
 int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<MyNode>();
+    auto node = std::make_shared<TurtleSpawnerNode>();
     rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;

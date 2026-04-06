@@ -85,16 +85,16 @@ class TurtleSpawnerNode(Node):
         # Forward the request to turtlesim
         self.get_logger().info(f"Spawning turtle {request.name} at ({request.x}, {request.y})")
         
-        # Call turtlesim synchronously for simplicity in this proxy
+        # Call turtlesim asynchronously
         self.spawn_client_.call_async(request)
 
         response.name = request.name
 
         msg = Turtle()
         msg.name = request.name
-        msg.x = request.y
-        msg.y = request.theta
-        msg.theta = request.name
+        msg.x = request.x
+        msg.y = request.y
+        msg.theta = request.theta
         self.get_logger().info(f"Spawned Turtle {request.name}")
         self.turtles_publisher_.publish(msg)
 
