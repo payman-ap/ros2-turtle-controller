@@ -4,7 +4,7 @@
   <name>my_py_turtle</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="ros@todo.todo">ros</maintainer>
+  <maintainer email="payman.git@pm.me">ros</maintainer>
   <license>TODO: License declaration</license>
 
   <depend>rclpy</depend>
