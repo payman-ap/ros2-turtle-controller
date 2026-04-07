@@ -1,5 +1,4 @@
 #include "rclcpp/rclcpp.hpp"
-#include "rclcpp/rclcpp.hpp"
 #include "example_interfaces/msg/string.hpp"
 #include "my_robot_interfaces/srv/catch_turtle.hpp"
 #include "my_robot_interfaces/srv/spawn_turtle.hpp"
@@ -17,6 +16,8 @@
 
 using namespace std::placeholders;
 using namespace std::chrono_literals;
+
+#define PI 3.14159265
 
 
 class TurtleControllerNode : public rclcpp::Node
@@ -111,7 +112,7 @@ private:
         auto pose_message = example_interfaces::msg::String();
         std::stringstream ss;
         ss << "Turtle pose: (" << pose_ptr_->x << "," << pose_ptr_->y <<  ") with " 
-                            << pose_ptr_->theta << "degrees";
+                            << pose_ptr_->theta << " degrees";
         pose_message.data = ss.str();
         pose_publisher_->publish(pose_message);
 
@@ -119,12 +120,12 @@ private:
         auto it = alive_turtles_.begin();
         while (it != alive_turtles_.end()){
             double dx = msg->x - it->second.first;
-            double dx = msg->y = it->second.second;
-            double dist = std::sqrt(std::pow(dx,2) + std::pow(dx,2));
+            double dy = msg->y - it->second.second;
+            double dist = std::sqrt(dx * dx + dy * dy);
 
             if (dist < this->kill_distance_threshold_){
                 this->kill_turtle(it->first);
-                this->myspawn_new_turtle();
+                this->myspawn_new_turtle(); // Spawn a replacement
                 it = alive_turtles_.erase(it);
             }
             else
@@ -145,32 +146,118 @@ private:
     
     void move_to_closest_turtle()
     {
-        //
+        if (!pose_ptr_){
+            return;
+        }
+        if (alive_turtles_.empty()){
+            RCLCPP_INFO(this->get_logger(), "No turtles to hunt?");
+            this->move_spiral();
+            return;
+        }
+
+        double t1_x = pose_ptr_->x;
+        double t1_y = pose_ptr_->y;
+        double target_x = 0.0;
+        double target_y = 0.0;
+        double min_dist = std::numeric_limits<double>::infinity();
+        std::string closest_name = "";
+
+        double dx, dy, dist, target_x, target_y;
+
+
+        auto it = alive_turtles_.begin();
+        for (const auto & [name, pos] : this->alive_turtles_) {
+            double dx = pos.first - t1_x;  // Target - Current
+            double dy = pos.second - t1_y;
+            double dist = std::sqrt(dx*dx + dy*dy);
+
+            if (dist < min_dist) {
+                min_dist = dist;
+                target_x = pos.first;
+                target_y = pos.second;
+            }
+        }
+        
+        // Calculate the motion
+        double target_angle = std::atan2(target_y - t1_y, target_x - t1_x);
+        double steering_angle = target_angle - pose_ptr_->theta;
+
+
+        // Normalize angle_error to stay between -pi and pi (prevents spinning 350 degrees)
+        steering_angle = std::atan2(std::sin(steering_angle), std::cos(steering_angle));
+
+        // Generating the Twist command
+        auto cmd = geometry_msgs::msg::Twist();
+
+        if (min_dist > 0.1){
+            // Tolerance: stop if we are 0.1 units away
+            // Proportional Control: move faster if far, slow down as you get closer
+            cmd.linear.x = this->p_gain_ * min_dist;
+            cmd.angular.z = this->angular_gain_ * steering_angle;
+        }
+        else {
+            cmd.linear.x = 0.0;
+            cmd.angular.z = 0.0;
+        }
+        cmd_vel_publisher_->publish(cmd);
+
     }
     
     void control_loop()
     {
-        //
+        if (this->current_iteration_ >= this->max_iterations_){
+            this->timer_->cancel();
+            return;
+        }
+
+        // this->spawn_new_turtle();
+        this->myspawn_new_turtle();
+
+        kill_timer_ = this->create_wall_timer(750ms,
+        std::bind(&TurtleControllerNode::kill_timer_callback, this));
+        ++this->current_iteration_;
     }
 
     void kill_timer_callback()
     {
-        //
+        this->kill_timer_->cancel();
+        this->kill_last_turtle();
     }
 
-    void callback_alive_turtles()
+    void callback_alive_turtles(const my_robot_interfaces::msg::Turtle::SharedPtr msg)
     {
-        //
+        RCLCPP_INFO(this->get_logger(), "Received new turtle");
+
+        this->alive_turtles_[msg->name] = std::make_pair(msg->x, msg->y);
+        this->publish_alive_turtles_array();
     }
 
-    void callback_turtles_array()
+    void callback_turtles_array(const my_robot_interfaces::msg::TurtleArray::SharedPtr msg)
     {
-        //
+        // clear the turtles map (like dict in Py)
+        this->alive_turtles_.clear(); 
+        // Rebuild the dictionary from the message
+        for (const auto& turtle : msg->turtles){
+            this->alive_turtles_[turtle.name] = std::make_pair(turtle.x, turtle.y); //{turtle.x, turtle.y}
+        }
+        RCLCPP_INFO(this->get_logger(), "Updated alive turtles dictionary: %d turtles.", 
+                                                std::to_string(this->alive_turtles_.size()));
     }
 
     void publish_alive_turtles_array()
     {
-        //
+        auto msg = my_robot_interfaces::msg::TurtleArray();
+        for (const auto & [name, pos] : this->alive_turtles_){
+            auto turtle = my_robot_interfaces::msg::Turtle();
+
+            turtle.name = name;
+            turtle.x = pos.first;
+            turtle.y = pos.second;
+            turtle.theta = 0.0;
+
+            msg.turtles.push_back(turtle);
+        }
+        turtles_array_publisher_->publish(msg);
     }
 
     void myspawn_new_turtle()
@@ -187,7 +274,7 @@ private:
         myspawn_client_->async_send_request(request,
                         std::bind(&TurtleControllerNode::callback_call_myspawn,this,_1));
         
-        this->last_spawned_name = "";
+        this->last_spawned_name_ = "";
     }
 
     void spawn_new_turtle()
@@ -204,7 +291,7 @@ private:
         spawn_client_->async_send_request(request,
                 std::bind(&TurtleControllerNode::callback_call_spawn, this, _1));
         
-        this->last_spawned_name = "";
+        this->last_spawned_name_ = "";
     }
 
     void kill_turtle(const std::string name)
@@ -218,12 +305,17 @@ private:
 
     void kill_last_turtle()
     {
-        //
+        return
     }
 
-    void after_kill()
+    void after_kill(const std::string &name)
     {
-        //
+        auto it = alive_turtles_.find(name);
+        if (it != alive_turtles_.end()){
+            alive_turtles_.erase(it);
+        }
+        this->publish_alive_turtles_array();
+        RCLCPP_INFO(this->get_logger(), "Ate %s!", name.c_str());
     }
 
     void callback_call_spawn(rclcpp::Client<turtlesim::srv::Spawn>::SharedFuture future)
@@ -231,7 +323,7 @@ private:
         try {
             // here in C++, the response is the result of the future
             auto response = future.get();
-            this->last_spawned_name = response->name;
+            this->last_spawned_name_ = response->name;
             RCLCPP_INFO(this->get_logger(), "Successfully spawned: %s", response->name.c_str());
         }
         catch (const std::exception &e){
@@ -244,7 +336,7 @@ private:
         try {
             // here in C++, the response is the result of the future
             auto response = future.get();
-            this->last_spawned_name = response->name;
+            this->last_spawned_name_ = response->name;
             RCLCPP_INFO(this->get_logger(), "Successfully spawned: %s", response->name.c_str());
         }
         catch (const std::exception &e){
@@ -272,7 +364,7 @@ private:
 
     turtlesim::msg::Pose::SharedPtr pose_ptr_; // array/vector
     std::map<std::string, std::pair<double, double>> alive_turtles_;
-    std::string last_spawned_name;
+    std::string last_spawned_name_;
 
     std::mt19937 gen_; // shuffler
 
@@ -291,6 +383,7 @@ private:
     
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::TimerBase::SharedPtr move_timer_;
+    rclcpp::TimerBase::SharedPtr kill_timer_;
 
 
 };
