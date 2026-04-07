@@ -33,13 +33,13 @@ public:
         this->declare_parameter("p_gain", 1.5);
         this->declare_parameter("angular_gain", 2.0);
 
-        int max_iterations = this->get_parameter("max_alive_turtles").as_int();
-        double kill_distance_threshold = this->get_parameter("kill_distance_threshold").as_double();
-        double linear_vel = this->get_parameter("linear_vel").as_double();
-        double radius = this->get_parameter("radius").as_double();
-        double angle_decrement = this->get_parameter("angle_decrement").as_double();
-        double p_gain = this->get_parameter("p_gain").as_double();
-        double angular_gain = this->get_parameter("angular_gain").as_double();
+        max_iterations_ = this->get_parameter("max_alive_turtles").as_int();
+        kill_distance_threshold_ = this->get_parameter("kill_distance_threshold").as_double();
+        linear_vel_ = this->get_parameter("linear_vel").as_double();
+        radius_ = this->get_parameter("radius").as_double();
+        angle_decrement_ = this->get_parameter("angle_decrement").as_double();
+        p_gain_ = this->get_parameter("p_gain").as_double();
+        angular_gain_ = this->get_parameter("angular_gain").as_double();
 
         // random generator
         std::random_device rd;
@@ -107,37 +107,39 @@ public:
 private:
     void pose_callback(const turtlesim::msg::Pose::SharedPtr msg)
     {
-        pose_ = msg;
+        pose_ptr_ = msg;
         auto pose_message = example_interfaces::msg::String();
         std::stringstream ss;
-        ss = "Turtle pose: (" << pose_.x << "," << std::string(pose_.y) <<  ") with " 
-                            << std::string(pose_.theta) << "degrees";
+        ss << "Turtle pose: (" << pose_ptr_->x << "," << pose_ptr_->y <<  ") with " 
+                            << pose_ptr_->theta << "degrees";
         pose_message.data = ss.str();
         pose_publisher_->publish(pose_message);
 
-        double t1_x = msg.x;
-        double t1_y = msg.y;
         // Eating turtle logic
-        for(int i; i <= sizeof(alive_turtles); ++i)
-        {
-            double pos = alive_turtles[i];
-            string name = "";
-            double dist = sqrt(pow(t1_x - pos[0], 2) + pow(t1_y - pos[1], 2));
-            if (dist < this->kill_distance_threshold)
-            {
-                this->kill_turtle(name);
+        auto it = alive_turtles_.begin();
+        while (it != alive_turtles_.end()){
+            double dx = msg->x - it->second.first;
+            double dx = msg->y = it->second.second;
+            double dist = std::sqrt(std::pow(dx,2) + std::pow(dx,2));
+
+            if (dist < this->kill_distance_threshold_){
+                this->kill_turtle(it->first);
                 this->myspawn_new_turtle();
+                it = alive_turtles_.erase(it);
+            }
+            else
+            {
+                ++it;
             }
         }
-
     }
 
     void move_spiral()
     {
         auto cmd = geometry_msgs::msg::Twist();
-        cmd->linear.x = this->linear_vel;
-        cmd->angular.z = this->linear_vel / this->radius;
-        this->radius += 0.01;
+        cmd.linear.x = this->linear_vel_;
+        cmd.angular.z = this->linear_vel_ / this->radius_;
+        this->radius_ += 0.01;
         cmd_vel_publisher_->publish(cmd);
     }
     
@@ -171,7 +173,7 @@ private:
         //
     }
 
-    void myspawn_new_turtle(rclcpp::Client<my_robot_interfaces::srv::SpawnTurtle>::SharedFuture future)
+    void myspawn_new_turtle()
     {
         std::uniform_real_distribution<double> dist_pos(1.0, 10.0);
         std::uniform_real_distribution<double> dist_theta(0.0, 6.28);
@@ -188,7 +190,7 @@ private:
         this->last_spawned_name = "";
     }
 
-    void spawn_new_turtle(rclcpp::Client<turtlesim::srv::Spawn>::SharedFuture future)
+    void spawn_new_turtle()
     {
         std::uniform_real_distribution<double> dist_pos(1.0, 10.0);
         std::uniform_real_distribution<double> dist_theta(0.0, 6.28);
@@ -262,11 +264,14 @@ private:
     }
 
 
-
     int counter_;
-    int current_iteration = 0;
+    int max_iterations_;
+    int current_iteration_ = 0;
+    double kill_distance_threshold_;
+    double p_gain_, angular_gain_, linear_vel_, radius_, angle_decrement_;
+
     turtlesim::msg::Pose::SharedPtr pose_ptr_; // array/vector
-    int alive_turtles; // array/vector
+    std::map<std::string, std::pair<double, double>> alive_turtles_;
     std::string last_spawned_name;
 
     std::mt19937 gen_; // shuffler
