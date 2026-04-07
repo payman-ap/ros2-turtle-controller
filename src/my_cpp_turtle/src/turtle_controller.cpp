@@ -12,6 +12,8 @@
 #include <cmath>
 #include <random>
 #include <sstream>
+#include <map>
+#include <limits>
 
 
 using namespace std::placeholders;
@@ -48,10 +50,10 @@ public:
         
         // === Clients ===
 
-        spawn_client_ = this->create_client<turtlesim::srv::Spawn>("spawn");
-        kill_client_ = this->create_client<turtlesim::srv::Kill>("kill");
-        myspawn_client_ = this->create_client<my_robot_interfaces::srv::SpawnTurtle>("myspawn");
-        catch_client_ = this->create_client<my_robot_interfaces::srv::CatchTurtle>("catch");
+        spawn_client_ = this->create_client<turtlesim::srv::Spawn>("trigger_spawn");
+        kill_client_ = this->create_client<turtlesim::srv::Kill>("trigger_kill");
+        myspawn_client_ = this->create_client<my_robot_interfaces::srv::SpawnTurtle>("trigger_myspawn");
+        catch_client_ = this->create_client<my_robot_interfaces::srv::CatchTurtle>("trigger_catch");
 
         while (!spawn_client_->wait_for_service(1s)) {
             if (!rclcpp::ok()) {
@@ -160,12 +162,7 @@ private:
         double target_x = 0.0;
         double target_y = 0.0;
         double min_dist = std::numeric_limits<double>::infinity();
-        std::string closest_name = "";
 
-        double dx, dy, dist, target_x, target_y;
-
-
-        auto it = alive_turtles_.begin();
         for (const auto & [name, pos] : this->alive_turtles_) {
             double dx = pos.first - t1_x;  // Target - Current
             double dy = pos.second - t1_y;
@@ -214,7 +211,8 @@ private:
         this->myspawn_new_turtle();
 
         kill_timer_ = this->create_wall_timer(750ms,
-        std::bind(&TurtleControllerNode::kill_timer_callback, this));
+                        std::bind(&TurtleControllerNode::kill_timer_callback, this));
+
         ++this->current_iteration_;
     }
 
@@ -240,8 +238,7 @@ private:
         for (const auto& turtle : msg->turtles){
             this->alive_turtles_[turtle.name] = std::make_pair(turtle.x, turtle.y); //{turtle.x, turtle.y}
         }
-        RCLCPP_INFO(this->get_logger(), "Updated alive turtles dictionary: %d turtles.", 
-                                                std::to_string(this->alive_turtles_.size()));
+        RCLCPP_INFO(this->get_logger(), "Updated: %zu turtles.", this->alive_turtles_.size());
     }
 
     void publish_alive_turtles_array()
@@ -294,8 +291,9 @@ private:
         this->last_spawned_name_ = "";
     }
 
-    void kill_turtle(const std::string name)
+    void kill_turtle(const std::string &name)
     {
+        // & avoids string copy
         // auto request = std::make_shared<turtlesim::srv::Kill::Request>();
         auto request = std::make_shared<my_robot_interfaces::srv::CatchTurtle::Request>();
         request->name = name;
@@ -305,7 +303,7 @@ private:
 
     void kill_last_turtle()
     {
-        return
+        return;
     }
 
     void after_kill(const std::string &name)
