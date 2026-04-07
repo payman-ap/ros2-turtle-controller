@@ -24,14 +24,14 @@ public:
                 return;
                 }
                 RCLCPP_INFO(this->get_logger(), "/spawn service not available, waiting again...");
-            }
+        }
         while (!kill_client_->wait_for_service(1s)) {
             if (!rclcpp::ok()) {
                 RCLCPP_INFO(this->get_logger(), "Interrupted while waiting for /kill service...");
             return;
             }
                 RCLCPP_INFO(this->get_logger(), "/kill service not available, waiting again...");
-            }
+        }
         
         // === Services ===
         spawn_service_ = this->create_service<turtlesim::srv::Spawn>(
