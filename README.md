@@ -28,9 +28,12 @@ ros2_turtle_controller/
 
 Then reference it in Markdown:
 
-```markdown
+## Demo
+
+### Multi-Agent Simulation
+
 ![Multi Agent Demo](media/multi_agent_demo.gif)
-```
+
 
 ---
 
@@ -492,6 +495,38 @@ ROS2 Humble
 Fedora 44
 Docker
 ```
+
+
+### Example to Run on Fedora 44 (naming might differ)
+
+```bash
+#!/bin/bash
+
+xhost +local:docker >/dev/null 2>&1
+
+CONTAINER_NAME="ros2_env_$(whoami)_$$"
+
+docker run -it --rm \
+  --name "$CONTAINER_NAME" \
+  --net=host \
+  --ipc=host \
+  --pid=host \
+  --device /dev/dri \
+  --security-opt label=disable \
+  -e DISPLAY=$DISPLAY \
+  -e ROS_DOMAIN_ID=0 \
+  -e RMW_IMPLEMENTATION=rmw_fastrtps_cpp \
+  -v /tmp/.X11-unix:/tmp/.X11-unix:Z \
+  -v $HOME/ros/workspaces/turtle_ws:/ros2_ws \
+  turtle-project:latest \
+  bash -c "
+    source /opt/ros/humble/setup.bash &&
+    source /ros2_ws/install/setup.bash &&
+    exec bash
+  "
+
+```
+
 
 Benefits:
 
