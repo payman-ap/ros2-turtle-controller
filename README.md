@@ -12,12 +12,6 @@ This project is designed as a **learning, demonstration, and portfolio system** 
 
 ### Multi-Agent Simulation
 
-Place your recorded demo here after capturing it:
-
-```
-media/multi_agent_demo.gif
-```
-
 Example:
 
 ```
